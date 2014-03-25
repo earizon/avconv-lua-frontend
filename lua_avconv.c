@@ -2544,13 +2544,13 @@ static int LUA_transcode(lua_State *L)
      }
      argc++; 
      argv[argc] = NULL;
-main(argc, argv);
+     main(argc, argv);
      return 0;
 }
 
 int luaopen_avconv(lua_State *L) {
      static const luaL_Reg avconv_l[] = { 
-         {"transcode", LUA_transcode },
+         {"run", LUA_transcode },
          {NULL, NULL} 
      };
      luaL_openlib(L, "avconv", avconv_l, 0); /* register metatable functions */
