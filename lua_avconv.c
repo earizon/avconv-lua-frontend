@@ -169,6 +169,10 @@ static int decode_interrupt_cb(void *ctx)
 
 const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
 
+static unsigned int metadata_secs_duration = 0; // TODO:(0) //@mj
+// static unsigned int metadata_bitrate       = 0; // TODO:(0)
+// static unsigned int metadata_videoWidth    = 0; // TODO:(0)
+// static unsigned int metadata_videoHeight   = 0; // TODO:(0)
 static void avconv_cleanup(int ret)
 {
     int i, j;
@@ -197,7 +201,7 @@ static void avconv_cleanup(int ret)
 
     /* close files */
     for (i = 0; i < nb_output_files; i++) {
-        AVFormatContext *s = output_files[i]->ctx;
+        AVFormatContext *s = output_files[i]->ctx; // @mj
         if (s && s->oformat && !(s->oformat->flags & AVFMT_NOFILE) && s->pb)
             avio_close(s->pb);
         avformat_free_context(s);
@@ -222,6 +226,11 @@ static void avconv_cleanup(int ret)
         av_freep(&output_streams[i]);
     }
     for (i = 0; i < nb_input_files; i++) {
+        // detadata_secs_duration = &input_files[i]->ctx->duration / AV_TIME_BASE; // @mj
+        int auxi1;
+        // auxi1 = *(&input_files[i]->recording_time)/ AV_TIME_BASE;
+        auxi1 = *(&input_files[i]->ctx->duration) / AV_TIME_BASE; // @mj
+        if (auxi1> metadata_secs_duration)  metadata_secs_duration = auxi1;
         avformat_close_input(&input_files[i]->ctx);
         av_freep(&input_files[i]);
     }
@@ -254,8 +263,8 @@ static void avconv_cleanup(int ret)
     }
     // lua_error will setjmp ("raise exception") to LUA controller. This will avoid
     // calling exit from the calling function exit_program@cmdutils.
-    lua_error(GLOBAL_LUA_STATE);
-    printf("WARN:avconv_cleanup We must never reach this code.\n");
+    if (ret != -1234)
+        lua_error(GLOBAL_LUA_STATE); // TODO:(0) Use something better than an arbitrary value
 }
 
 void assert_avoptions(AVDictionary *m)
@@ -2511,9 +2520,10 @@ int main(int argc, char **argv)
 
 static int noop(void) {return 0;}
 
-static char* stdout_buf;  // Buffer
+static char* stdout_buf; // Buffer
 static unsigned int stdout_buf_len;
 static unsigned int stdout_buf_pos;
+
 static size_t writer_stdout(void *cookie, char const *data, size_t leng)
 {
     // Arbitrarely we allow a maximum buffer with first 2048 output 
@@ -2587,15 +2597,18 @@ static int LUA_transcode(lua_State *L)
      }
      argc++; 
      argv[argc] = NULL;
+     metadata_secs_duration = 0; // Reset any old value
      main(argc, argv);
+     avconv_cleanup(-1234); // -1234 => Avoid LuaError (setjmp/"raise exception")
 
      lua_pushstring (L, stdout_buf);
+     lua_pushinteger (L, metadata_secs_duration);
      /*  NOTICE: Do not free stdout_buf.
       *  Since now it is on the LUA stack it
       *  will be freed by LUA.  */
      stdout = stdout_ori; // Reset state
      stderr = stderr_ori; // Reset state
-     return 1;
+     return 2;
 }
 
 int luaopen_avconv(lua_State *L) {
@@ -2603,6 +2616,28 @@ int luaopen_avconv(lua_State *L) {
          {"run", LUA_transcode },
          {NULL, NULL} 
      };
+     /* Ref: http://libav.org/avconv.html:
+      *  By default ... if coloring is supported ... colors are used ...
+      *  ... can be disabled setting the environment variable AV_LOG_FORCE_NOCOLOR ... */
+     putenv("AV_LOG_FORCE_NOCOLOR=yes"); // avoid weird color characters.
      luaL_openlib(L, "avconv", avconv_l, 0); /* register metatable functions */
      return 1;
 }
+
+/*
+lua_avconv.c:-------------------------------------------------
+
+AVFormatContext *s = output_files[i]->ctx; // https://libav.org/doxygen/master/structAVFormatContext.html
+                     ^  OutputFile**
+
+avconv_opt.c:-------------------------------------------------
+ic = avformat_alloc_context();
+^AVFormatContext *
+
+libavformat/utils.c:------------------------------------------
+// void av_dump_format(AVFormatContext *ic, int index,
+
+if (ic->duration != AV_NOPTS_VALUE) {
+    secs  = ic->duration / AV_TIME_BASE;
+    us    = ic->duration % AV_TIME_BASE;
+*/
