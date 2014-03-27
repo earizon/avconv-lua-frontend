@@ -2574,7 +2574,6 @@ static int LUA_transcode(lua_State *L)
      const int MAX_ARG_NUMBER = 40, MAX_STRING_LENGTH=70;
      int argc = -1;
      char **argv;
-     FILE *stdout_ori, *stderr_ori;
 
      argv=malloc(MAX_ARG_NUMBER * sizeof(char*));
      GLOBAL_LUA_STATE = L;
@@ -2604,8 +2603,6 @@ static int LUA_transcode(lua_State *L)
      lua_pushinteger (L, metadata_secs_duration);
      lua_pushinteger (L, metadata_videoWidth);
      lua_pushinteger (L, metadata_videoHeight);
-     stdout = stdout_ori; // Reset state
-     stderr = stderr_ori; // Reset state
      return 3;
 }
 
