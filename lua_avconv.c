@@ -171,8 +171,8 @@ const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
 
 static unsigned int metadata_secs_duration = 0; // TODO:(0) //@mj
 // static unsigned int metadata_bitrate       = 0; // TODO:(0)
-// static unsigned int metadata_videoWidth    = 0; // TODO:(0)
-// static unsigned int metadata_videoHeight   = 0; // TODO:(0)
+static unsigned int metadata_videoWidth    = 0; // TODO:(0)
+static unsigned int metadata_videoHeight   = 0; // TODO:(0)
 static void avconv_cleanup(int ret)
 {
     int i, j;
@@ -225,15 +225,53 @@ static void avconv_cleanup(int ret)
         av_freep(&output_streams[i]->logfile_prefix);
         av_freep(&output_streams[i]);
     }
-    for (i = 0; i < nb_input_files; i++) {
-        // detadata_secs_duration = &input_files[i]->ctx->duration / AV_TIME_BASE; // @mj
+   
+
+     for (i = 0; i < nb_input_files; i++) {
+        AVFormatContext *ic = input_files[i]->ctx;
+/* (gdb) print *ic
+    $2 = {
+        av_class = 0xb7d179a0, iformat = 0xb7d3fb80, oformat = 0x0, priv_data = 0x80996e0, pb = 0x80a1720,
+        ctx_flags = 0, nb_streams = 2, streams = 0x80867b0, filename = "/home/d-cast/Videos/300_full.mp4", 
+        '\000' <repeats 991 times>, start_time = 0, duration = 57322667,
+        bit_rate = 18554910, packet_size = 0, max_delay = -1, flags = 516, probesize = 5000000, 
+        max_analyze_duration = 5000000, key = 0x0, keylen = 0, nb_programs = 0, programs = 0x0,
+        video_codec_id = AV_CODEC_ID_NONE, audio_codec_id = AV_CODEC_ID_NONE, subtitle_codec_id = AV_CODEC_ID_NONE,
+        max_index_size = 1048576, max_picture_buffer = 3041280, nb_chapters = 0, chapters = 0x0, 
+        metadata = 0x8099640, start_time_realtime = 0, fps_probe_size = -1, error_recognition = 1,
+        interrupt_callback = {callback = 0xb7f71780 <decode_interrupt_cb>, opaque = 0x0}, debug = 0,
+        max_interleave_delta = 10000000, packet_buffer = 0x0, packet_buffer_end = 0x0,
+        data_offset = 132952119, raw_packet_buffer = 0x0, raw_packet_buffer_end = 0x0, 
+        parse_queue = 0x0, parse_queue_end = 0x0, raw_packet_buffer_remaining_size = 2500000, offset = 0,
+        offset_timebase = {num = 0, den = 0}, internal = 0x80899e0}
+   (gdb) print *ic->iformat   
+   $4 = {name = 0xb7d0f818 "mov,mp4,m4a,3gp,3g2,mj2", long_name = 0xb7d0f830 "QuickTime / MOV", flags = 0, 
+         extensions = 0x0, codec_tag = 0x0, priv_class = 0x0, next = 0xb7d3ff20, raw_codec_id = 0, 
+         priv_data_size = 96, read_probe = 0xb7c6d560 <mov_probe>, read_header = 0xb7c70860 <mov_read_header>,
+         read_packet = 0xb7c6ff50 <mov_read_packet>, read_close = 0xb7c6d650 <mov_read_close>, 
+         read_seek = 0xb7c70e30 <mov_read_seek>, read_timestamp = 0, read_play = 0, read_pause = 0, read_seek2 = 0}
+*/
         int auxi1;
-        // auxi1 = *(&input_files[i]->recording_time)/ AV_TIME_BASE;
-        auxi1 = *(&input_files[i]->ctx->duration) / AV_TIME_BASE; // @mj
-        if (auxi1> metadata_secs_duration)  metadata_secs_duration = auxi1;
+        { // Get duration metadata.
+            auxi1 = (ic->duration) / AV_TIME_BASE; // @mj
+            if (auxi1> metadata_secs_duration)  metadata_secs_duration = auxi1;
+        }
+        { // Get size metadata
+            int k;
+            if (!ic->nb_streams) { continue; }
+            for (k = 0; k < ic->nb_streams; k++) {
+                if (ic->streams[k]->codec->width == 0) continue;
+                metadata_videoWidth  = ic->streams[k]->codec->width  ;
+                metadata_videoHeight = ic->streams[k]->codec->height ;
+            }
+        }
         avformat_close_input(&input_files[i]->ctx);
         av_freep(&input_files[i]);
     }
+
+
+
+
     for (i = 0; i < nb_input_streams; i++) {
         av_frame_free(&input_streams[i]->decoded_frame);
         av_frame_free(&input_streams[i]->filter_frame);
@@ -2598,17 +2636,21 @@ static int LUA_transcode(lua_State *L)
      argc++; 
      argv[argc] = NULL;
      metadata_secs_duration = 0; // Reset any old value
+     metadata_videoWidth    = 0;
+     metadata_videoHeight   = 0;
      main(argc, argv);
      avconv_cleanup(-1234); // -1234 => Avoid LuaError (setjmp/"raise exception")
 
      lua_pushstring (L, stdout_buf);
      lua_pushinteger (L, metadata_secs_duration);
+     lua_pushinteger (L, metadata_videoWidth);
+     lua_pushinteger (L, metadata_videoHeight);
      /*  NOTICE: Do not free stdout_buf.
       *  Since now it is on the LUA stack it
       *  will be freed by LUA.  */
      stdout = stdout_ori; // Reset state
      stderr = stderr_ori; // Reset state
-     return 2;
+     return 4;
 }
 
 int luaopen_avconv(lua_State *L) {
