@@ -229,28 +229,6 @@ static void avconv_cleanup(int ret)
 
      for (i = 0; i < nb_input_files; i++) {
         AVFormatContext *ic = input_files[i]->ctx;
-/* (gdb) print *ic
-    $2 = {
-        av_class = 0xb7d179a0, iformat = 0xb7d3fb80, oformat = 0x0, priv_data = 0x80996e0, pb = 0x80a1720,
-        ctx_flags = 0, nb_streams = 2, streams = 0x80867b0, filename = "/home/d-cast/Videos/300_full.mp4", 
-        '\000' <repeats 991 times>, start_time = 0, duration = 57322667,
-        bit_rate = 18554910, packet_size = 0, max_delay = -1, flags = 516, probesize = 5000000, 
-        max_analyze_duration = 5000000, key = 0x0, keylen = 0, nb_programs = 0, programs = 0x0,
-        video_codec_id = AV_CODEC_ID_NONE, audio_codec_id = AV_CODEC_ID_NONE, subtitle_codec_id = AV_CODEC_ID_NONE,
-        max_index_size = 1048576, max_picture_buffer = 3041280, nb_chapters = 0, chapters = 0x0, 
-        metadata = 0x8099640, start_time_realtime = 0, fps_probe_size = -1, error_recognition = 1,
-        interrupt_callback = {callback = 0xb7f71780 <decode_interrupt_cb>, opaque = 0x0}, debug = 0,
-        max_interleave_delta = 10000000, packet_buffer = 0x0, packet_buffer_end = 0x0,
-        data_offset = 132952119, raw_packet_buffer = 0x0, raw_packet_buffer_end = 0x0, 
-        parse_queue = 0x0, parse_queue_end = 0x0, raw_packet_buffer_remaining_size = 2500000, offset = 0,
-        offset_timebase = {num = 0, den = 0}, internal = 0x80899e0}
-   (gdb) print *ic->iformat   
-   $4 = {name = 0xb7d0f818 "mov,mp4,m4a,3gp,3g2,mj2", long_name = 0xb7d0f830 "QuickTime / MOV", flags = 0, 
-         extensions = 0x0, codec_tag = 0x0, priv_class = 0x0, next = 0xb7d3ff20, raw_codec_id = 0, 
-         priv_data_size = 96, read_probe = 0xb7c6d560 <mov_probe>, read_header = 0xb7c70860 <mov_read_header>,
-         read_packet = 0xb7c6ff50 <mov_read_packet>, read_close = 0xb7c6d650 <mov_read_close>, 
-         read_seek = 0xb7c70e30 <mov_read_seek>, read_timestamp = 0, read_play = 0, read_pause = 0, read_seek2 = 0}
-*/
         int auxi1;
         { // Get duration metadata.
             auxi1 = (ic->duration) / AV_TIME_BASE; // @mj
@@ -2558,7 +2536,7 @@ int main(int argc, char **argv)
 
 static int noop(void) {return 0;}
 
-static int LUA_transcode(lua_State *L)
+static int LUA_run(lua_State *L)
 {
      /*
       *  Ussage:
@@ -2568,7 +2546,6 @@ static int LUA_transcode(lua_State *L)
       *  avconv.transcode("--bla --ble --bli");
       */
      char *ps_opt = luaL_checkstring(L, 1); // <- TODO:(0) Remove padding and duplicated spaces.
-     // printf("debug LUA_transcode: input: %s \n", ps_opt);
      const char *separator = " ";
      char *tok = strtok(ps_opt, separator);
      const int MAX_ARG_NUMBER = 40, MAX_STRING_LENGTH=70;
@@ -2584,7 +2561,6 @@ static int LUA_transcode(lua_State *L)
      while (tok) {
          // TODO:(0) Check that strlen(tok) < MAX_STRING_LENGTH
          if (tok[0]!=0) { 
-             // printf("debug LUA_transcode: %d Token: '%s'\n", argc, tok);
              argc++; 
              argv[argc] = malloc(MAX_STRING_LENGTH);
              if (argc > MAX_ARG_NUMBER) { /* TODO:(0) trigger error */ };
@@ -2608,7 +2584,7 @@ static int LUA_transcode(lua_State *L)
 
 int luaopen_avconv(lua_State *L) {
      static const luaL_Reg avconv_l[] = { 
-         {"run", LUA_transcode },
+         {"run", LUA_run },
          {NULL, NULL} 
      };
      /* Ref: http://libav.org/avconv.html:
@@ -2619,20 +2595,3 @@ int luaopen_avconv(lua_State *L) {
      return 1;
 }
 
-/*
-lua_avconv.c:-------------------------------------------------
-
-AVFormatContext *s = output_files[i]->ctx; // https://libav.org/doxygen/master/structAVFormatContext.html
-                     ^  OutputFile**
-
-avconv_opt.c:-------------------------------------------------
-ic = avformat_alloc_context();
-^AVFormatContext *
-
-libavformat/utils.c:------------------------------------------
-// void av_dump_format(AVFormatContext *ic, int index,
-
-if (ic->duration != AV_NOPTS_VALUE) {
-    secs  = ic->duration / AV_TIME_BASE;
-    us    = ic->duration % AV_TIME_BASE;
-*/
