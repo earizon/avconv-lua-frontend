@@ -255,7 +255,7 @@ static void avconv_cleanup(int ret)
     // lua_error will setjmp ("raise exception") to LUA controller. This will avoid
     // calling exit from the calling function exit_program@cmdutils.
     lua_error(GLOBAL_LUA_STATE);
-    printf("\WARN:avconv_cleanup We must never reach this code.\n");
+    printf("WARN:avconv_cleanup We must never reach this code.\n");
 }
 
 void assert_avoptions(AVDictionary *m)
@@ -2509,6 +2509,40 @@ int main(int argc, char **argv)
     return 0;
 }
 
+static int noop(void) {return 0;}
+
+static char* stdout_buf;  // Buffer
+static unsigned int stdout_buf_len;
+static unsigned int stdout_buf_pos;
+static size_t writer_stdout(void *cookie, char const *data, size_t leng)
+{
+    // Arbitrarely we allow a maximum buffer with first 2048 output 
+    // bytes.
+    if (stdout_buf_pos >=2048) { return; } // arbitrary security check
+    while ( (stdout_buf_len-stdout_buf_pos) < leng) {
+        stdout_buf_len += 1024;
+        stdout_buf =realloc(stdout_buf, stdout_buf_len);
+    }
+
+    strncpy(stdout_buf+stdout_buf_pos, data, leng);
+    stdout_buf_pos += leng;
+    return  leng;
+}
+
+static cookie_io_functions_t stdout_fns = {
+    // cookie_io_functions_t requires (gcc) -D_GNU_SOURCE . Otherwise undefined.
+    (void*) noop /*read*/, (void*) writer_stdout, (void*) noop/*read*/, (void*) noop/*read*/
+};
+
+static void _tolog(FILE **pfp)
+{
+    setvbuf(*pfp = fopencookie(NULL, "w", stdout_fns), NULL, _IOLBF, 0);
+    if (*pfp == NULL) {
+        printf("\n\nWARN: fopencookie failed \n\n");
+    }
+}
+
+
 static int LUA_transcode(lua_State *L)
 {
      /*
@@ -2523,10 +2557,19 @@ static int LUA_transcode(lua_State *L)
      const char *separator = " ";
      char *tok = strtok(ps_opt, separator);
      const int MAX_ARG_NUMBER = 40, MAX_STRING_LENGTH=70;
-     int argc = -1, idx =-1;
+     int argc = -1;
      char **argv;
+     FILE *stdout_ori, *stderr_ori;
+
      argv=malloc(MAX_ARG_NUMBER * sizeof(char*));
      GLOBAL_LUA_STATE = L;
+
+     stdout_buf_len = 1024;
+     stdout_buf = malloc(stdout_buf_len);
+     stdout_ori = stdout; // Keep a backup
+     stdout_ori = stderr; // Keep a backup
+     _tolog(&stdout); /* Redirect STDOUT to memory */
+     _tolog(&stderr); /* Redirect STDOUT to memory */
 
      argc++;
      argv[argc] = malloc(MAX_STRING_LENGTH);
@@ -2545,7 +2588,14 @@ static int LUA_transcode(lua_State *L)
      argc++; 
      argv[argc] = NULL;
      main(argc, argv);
-     return 0;
+
+     lua_pushstring (L, stdout_buf);
+     /*  NOTICE: Do not free stdout_buf.
+      *  Since now it is on the LUA stack it
+      *  will be freed by LUA.  */
+     stdout = stdout_ori; // Reset state
+     stderr = stderr_ori; // Reset state
+     return 1;
 }
 
 int luaopen_avconv(lua_State *L) {
