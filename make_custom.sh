@@ -1,6 +1,6 @@
 #!/bin/bash -x
 
-# This is an example/reference compilation script. It works guiven a directory layout similar to:
+# This is an example/reference compilation script. It works given a directory layout similar to:
 # ../01_fdk-aac
 # ../02_x264
 # ../03_libav
@@ -10,9 +10,9 @@
 # It has been compiled in Ubuntu Linux 13.10 AMD64 with (Same host and build machine)
 
 export LC_ALL=C
-LIBAV_DIR=../03_libav
-LUA_DIR=../01_lua-5.1.5/src
-DST_DIR=../BUILD/lib
+LIBAV_DIR=../03_libav         # <- An already compiled libav version is supposed to be already there
+LUA_DIR=../01_lua-5.1.5/src   # <- liblua.a is supposed to be already there
+DST_DIR=../BUILD/lib          # liblua_avconv.so will be placed here
 
 if [ ! -d ${DST_DIR} ]; then
     mkdir -p ${DST_DIR}
@@ -22,7 +22,7 @@ if [ ! -f ${LIBAV_DIR}/cmdutils.o ]; then
     exit 1
 fi
 
-DEBUG="-O1 -g" # Weird things happens whith -O2/O3 when debugging.
+DEBUG="-O0 -g" # Weird things happens whith -O2/O3 when debugging.
 # DEBUG="-O3"
 
 mv liblua_avconv.so liblua_avconv.so.0
