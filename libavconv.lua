@@ -45,8 +45,10 @@ function avf.getThumbnail(input, outputDir, outputName)
 
     cmd = ""
     cmd = cmd .. "-y "
-    cmd = cmd .. "-i " .. input .. " "
+    -- man avconv: "-ss position: When used as input option seeks in this input file to position, when used as an output option 
+    -- decodes but discards input until the timestamps reach position. This is slower, but more accurate."
     cmd = cmd .. "-ss 00:00:25.000 " -- TODO:(?) Arbitrary position in stream
+    cmd = cmd .. "-i " .. input .. " "
     cmd = cmd .. "-f image2 "
     cmd = cmd .. "-vframes 1 "
     cmd = cmd .. outputDir .. "/" .. outputName ..".png"
