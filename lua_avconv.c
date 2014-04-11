@@ -181,6 +181,7 @@ static void avconv_cleanup(int ret)
      extra_size = 0;
      nb_frames_dup = 0;
      nb_frames_drop = 0;
+     nb_filtergraphs = 0;
 
     for (i = 0; i < nb_filtergraphs; i++) {
         avfilter_graph_free(&filtergraphs[i]->graph);
