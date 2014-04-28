@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <alloca.h>
 
 lua_State *GLOBAL_LUA_STATE;
 
@@ -2553,17 +2554,17 @@ static int LUA_run(lua_State *L)
      int argc = -1;
      char **argv;
 
-     argv=malloc(MAX_ARG_NUMBER * sizeof(char*));
+     argv=alloca(MAX_ARG_NUMBER * sizeof(char*));
      GLOBAL_LUA_STATE = L;
 
      argc++;
-     argv[argc] = malloc(MAX_STRING_LENGTH);
+     argv[argc] = alloca(MAX_STRING_LENGTH);
      strcpy((char *)argv[argc], "avconv"); 
      while (tok) {
          // TODO:(0) Check that strlen(tok) < MAX_STRING_LENGTH
          if (tok[0]!=0) { 
              argc++; 
-             argv[argc] = malloc(MAX_STRING_LENGTH);
+             argv[argc] = alloca(MAX_STRING_LENGTH);
              if (argc > MAX_ARG_NUMBER) { /* TODO:(0) trigger error */ };
              strcpy((char *)argv[argc], tok); 
          }
