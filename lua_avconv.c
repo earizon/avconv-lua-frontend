@@ -2550,21 +2550,22 @@ static int LUA_run(lua_State *L)
      char *ps_opt = luaL_checkstring(L, 1); // <- TODO:(0) Remove padding and duplicated spaces.
      const char *separator = " ";
      char *tok = strtok(ps_opt, separator);
-     const int MAX_ARG_NUMBER = 40, MAX_STRING_LENGTH=70;
+     const int MAX_ARG_NUMBER = 40;
      int argc = -1;
      char **argv;
+     char *command;
 
      argv=alloca(MAX_ARG_NUMBER * sizeof(char*));
      GLOBAL_LUA_STATE = L;
 
      argc++;
-     argv[argc] = alloca(MAX_STRING_LENGTH);
-     strcpy((char *)argv[argc], "avconv"); 
+     command = "avconv"; 
+     argv[argc] = alloca(strlen (command)+1);
+     strcpy((char *)argv[argc], command /*"avconv"*/); 
      while (tok) {
-         // TODO:(0) Check that strlen(tok) < MAX_STRING_LENGTH
          if (tok[0]!=0) { 
              argc++; 
-             argv[argc] = alloca(MAX_STRING_LENGTH);
+             argv[argc] = alloca(strlen(tok)+1);
              if (argc > MAX_ARG_NUMBER) { /* TODO:(0) trigger error */ };
              strcpy((char *)argv[argc], tok); 
          }
