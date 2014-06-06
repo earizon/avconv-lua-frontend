@@ -156,7 +156,7 @@ sigterm_handler(int sig)
 
 static void term_init(void)
 {
-    signal(SIGINT , sigterm_handler); /* Interrupt (ANSI).    */
+    // signal(SIGINT , sigterm_handler); /* Interrupt (ANSI).    */
     signal(SIGTERM, sigterm_handler); /* Termination (ANSI).  */
 #ifdef SIGXCPU
     signal(SIGXCPU, sigterm_handler);
@@ -171,7 +171,7 @@ static int decode_interrupt_cb(void *ctx)
 const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
 
 static unsigned int metadata_secs_duration = 0; // TODO:(0) //@mj
-// static unsigned int metadata_bitrate       = 0; // TODO:(0)
+// static unsigned int metadata_bitrate    = 0; // TODO:(0)
 static unsigned int metadata_videoWidth    = 0; // TODO:(0)
 static unsigned int metadata_videoHeight   = 0; // TODO:(0)
 static void avconv_cleanup(int ret)
@@ -227,22 +227,24 @@ static void avconv_cleanup(int ret)
         av_freep(&output_streams[i]->logfile_prefix);
         av_freep(&output_streams[i]);
     }
-   
 
      for (i = 0; i < nb_input_files; i++) {
         AVFormatContext *ic = input_files[i]->ctx;
         int auxi1;
         { // Get duration metadata.
             auxi1 = (ic->duration) / AV_TIME_BASE; // @mj
-            if (auxi1> metadata_secs_duration)  metadata_secs_duration = auxi1;
+            if (auxi1 > metadata_secs_duration)  metadata_secs_duration = auxi1;
         }
         { // Get size metadata
             int k;
             if (!ic->nb_streams) { continue; }
             for (k = 0; k < ic->nb_streams; k++) {
-                if (ic->streams[k]->codec->width == 0) continue;
-                metadata_videoWidth  = ic->streams[k]->codec->width  ;
-                metadata_videoHeight = ic->streams[k]->codec->height ;
+printf("deleteme: **************************** :%d,%d\n",ic->streams[k]->codec->width, ic->streams[k]->codec->height);
+            if (ic->streams[k]->codec->width > metadata_videoWidth)
+                metadata_videoWidth   = ic->streams[k]->codec->width  ;
+            if (ic->streams[k]->codec->width>metadata_videoHeight)
+                metadata_videoHeight  = ic->streams[k]->codec->height ;
+printf("deleteme: **************************** :%d,%d\n",metadata_videoWidth, metadata_videoHeight);
             }
         }
         avformat_close_input(&input_files[i]->ctx);
@@ -2554,24 +2556,25 @@ static int LUA_run(lua_State *L)
      int argc = -1;
      char **argv;
      char *command;
+     int table_idx, table_pointer;
 
      argv=alloca(MAX_ARG_NUMBER * sizeof(char*));
      GLOBAL_LUA_STATE = L;
 
      argc++;
-     command = "avconv"; 
+     command = "avconv";
      argv[argc] = alloca(strlen (command)+1);
-     strcpy((char *)argv[argc], command /*"avconv"*/); 
+     strcpy((char *)argv[argc], command /*"avconv"*/);
      while (tok) {
-         if (tok[0]!=0) { 
-             argc++; 
+         if (tok[0]!=0) {
+             argc++;
              argv[argc] = alloca(strlen(tok)+1);
              if (argc > MAX_ARG_NUMBER) { /* TODO:(0) trigger error */ };
              strcpy((char *)argv[argc], tok); 
          }
          tok = strtok(NULL, separator);
      }
-     argc++; 
+     argc++;
      argv[argc] = NULL;
      metadata_secs_duration = 0; // Reset any old value
      metadata_videoWidth    = 0;
@@ -2579,16 +2582,32 @@ static int LUA_run(lua_State *L)
      main(argc, argv);
      avconv_cleanup(-1234); // -1234 => Avoid LuaError (setjmp/"raise exception")
 
+printf("deleteme: **************************** :%d,%d,%d\n",metadata_secs_duration,metadata_videoWidth, metadata_videoHeight);
+ //  lua_pushinteger (L, metadata_secs_duration);
+ //  lua_pushinteger (L, metadata_videoWidth);
+ //  lua_pushinteger (L, metadata_videoHeight);
+ //  return 3;
+
+     /* create result table */
+     lua_newtable(L);
+     table_pointer = lua_gettop(L);
+     table_idx = 1;
+     lua_pushinteger (L, table_idx++);  /* push key */
      lua_pushinteger (L, metadata_secs_duration);
+     lua_settable(L, table_pointer);
+     lua_pushinteger (L, table_idx++);  /* push key */
      lua_pushinteger (L, metadata_videoWidth);
+     lua_settable(L, table_pointer);
+     lua_pushinteger (L, table_idx++);  /* push key */
      lua_pushinteger (L, metadata_videoHeight);
-     return 3;
+     lua_settable(L, table_pointer);
+     return 1;
 }
 
 int luaopen_avconv(lua_State *L) {
-     static const luaL_Reg avconv_l[] = { 
+     static const luaL_Reg avconv_l[] = {
          {"run", LUA_run },
-         {NULL, NULL} 
+         {NULL, NULL}
      };
      /* Ref: http://libav.org/avconv.html:
       *  By default ... if coloring is supported ... colors are used ...
